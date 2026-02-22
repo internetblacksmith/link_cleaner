@@ -1,0 +1,29 @@
+# Flutter
+flutter/.dart_tool/
+flutter/build/
+flutter/.flutter-plugins
+flutter/.flutter-plugins-dependencies
+flutter/.packages
+flutter/pubspec.lock
+*.iml
+
+# React Native
+react_native/node_modules/
+react_native/.metro-health-check*
+react_native/android/app/build/
+react_native/android/.gradle/
+react_native/ios/Pods/
+react_native/ios/build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / Integration
+test/node_modules/

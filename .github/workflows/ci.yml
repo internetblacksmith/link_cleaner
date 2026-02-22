@@ -1,0 +1,256 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  FLUTTER_VERSION: '3.16.0'
+  NODE_VERSION: '18'
+  JAVA_VERSION: '11'
+
+jobs:
+  # ==================== Linting ====================
+  lint:
+    name: Lint Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Lint Flutter
+        run: make lint-flutter
+      
+      - name: Lint React Native
+        run: make lint-rn
+
+  # ==================== Unit Tests ====================
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup environment
+        run: make setup
+      
+      - name: Run Flutter tests
+        run: make test-unit-flutter
+      
+      - name: Run React Native tests
+        run: make test-unit-rn
+      
+      - name: Upload Flutter coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./flutter/coverage/lcov.info
+          flags: flutter
+      
+      - name: Upload React Native coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./react_native/coverage/lcov.info
+          flags: react-native
+
+  # ==================== Build ====================
+  build:
+    name: Build Apps
+    runs-on: ${{ matrix.os }}
+    needs: test-unit
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: android
+          - os: macos-latest
+            platform: ios
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup Java (Android only)
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+      
+      - name: Setup environment
+        run: make setup
+      
+      - name: Build Flutter ${{ matrix.platform }}
+        run: |
+          if [ "${{ matrix.platform }}" = "android" ]; then
+            cd flutter && flutter build apk --debug
+          else
+            cd flutter && flutter build ios --debug --simulator --no-codesign
+          fi
+      
+      - name: Build React Native ${{ matrix.platform }}
+        run: |
+          if [ "${{ matrix.platform }}" = "android" ]; then
+            cd react_native/android && ./gradlew assembleDebug
+          else
+            cd react_native/ios && pod install
+            xcodebuild -workspace LinkCleaner.xcworkspace -scheme LinkCleaner -configuration Debug -sdk iphonesimulator -derivedDataPath build
+          fi
+      
+      - name: Upload Flutter artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: flutter-${{ matrix.platform }}-debug
+          path: |
+            flutter/build/app/outputs/flutter-apk/app-debug.apk
+            flutter/build/ios/iphonesimulator/Runner.app
+      
+      - name: Upload React Native artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: react-native-${{ matrix.platform }}-debug
+          path: |
+            react_native/android/app/build/outputs/apk/debug/app-debug.apk
+            react_native/ios/build/Build/Products/Debug-iphonesimulator/LinkCleaner.app
+
+  # ==================== Integration Tests ====================
+  test-integration:
+    name: Integration Tests
+    runs-on: macos-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Install Appium
+        run: |
+          npm install -g appium@next
+          appium driver install flutter
+          appium driver install xcuitest
+      
+      - name: Setup test environment
+        run: cd test && npm install
+      
+      - name: Start iOS Simulator
+        run: |
+          xcrun simctl create "iPhone 14 Test" "iPhone 14" iOS16
+          xcrun simctl boot "iPhone 14 Test"
+      
+      - name: Run integration tests
+        run: make test-integration
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: test/reports/
+
+  # ==================== Release Build ====================
+  release:
+    name: Release Build
+    runs-on: ${{ matrix.os }}
+    if: github.ref == 'refs/heads/main'
+    needs: test-integration
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: android
+          - os: macos-latest
+            platform: ios
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Setup Java (Android only)
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+      
+      - name: Decode signing keys
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          if [ "${{ matrix.platform }}" = "android" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android-keystore.jks
+          else
+            echo "$IOS_CERTIFICATE_BASE64" | base64 -d > ios-certificate.p12
+            echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 -d > ios-provisioning.mobileprovision
+          fi
+      
+      - name: Build release
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ "${{ matrix.platform }}" = "android" ]; then
+            make build-flutter
+            make build-rn-android
+          else
+            make build-rn-ios
+          fi
+      
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-${{ matrix.platform }}
+          path: |
+            flutter/build/app/outputs/bundle/release/app-release.aab
+            react_native/android/app/build/outputs/bundle/release/app-release.aab
+            flutter/build/ios/ipa/*.ipa
+            react_native/ios/build/*.ipa

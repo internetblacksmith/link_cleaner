@@ -1,0 +1,32 @@
+{
+  "name": "link-cleaner-cross-platform-tests",
+  "version": "1.0.0",
+  "description": "Cross-platform integration tests for Link Cleaner",
+  "scripts": {
+    "test": "npm run test:all",
+    "test:all": "npm run test:flutter && npm run test:react-native",
+    "test:flutter": "PLATFORM=flutter cucumber-js",
+    "test:react-native": "PLATFORM=react-native cucumber-js",
+    "test:ios": "PLATFORM=ios cucumber-js",
+    "test:android": "PLATFORM=android cucumber-js",
+    "appium": "appium",
+    "report": "node generate-report.js"
+  },
+  "dependencies": {
+    "@cucumber/cucumber": "^10.0.1",
+    "@wdio/appium-service": "^8.24.1",
+    "appium": "^2.2.2",
+    "appium-flutter-driver": "^1.18.1",
+    "appium-uiautomator2-driver": "^2.34.1",
+    "appium-xcuitest-driver": "^5.8.0",
+    "chai": "^4.3.10",
+    "webdriverio": "^8.24.1"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.11",
+    "@types/cucumber": "^7.0.0",
+    "cucumber-html-reporter": "^7.1.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
