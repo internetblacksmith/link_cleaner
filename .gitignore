@@ -5,6 +5,8 @@ flutter/.flutter-plugins
 flutter/.flutter-plugins-dependencies
 flutter/.packages
 flutter/pubspec.lock
+flutter/node_modules/
+flutter/coverage/
 *.iml
 
 # React Native
@@ -27,3 +29,7 @@ Thumbs.db
 
 # Test / Integration
 test/node_modules/
+node_modules/
+
+# Backups
+*.backup
