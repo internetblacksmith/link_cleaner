@@ -1,5 +1,4 @@
 import '../entities/cleaned_url.dart';
-import '../entities/url_parameter.dart';
 
 abstract class UrlRepository {
   Future<CleanedUrl> parseUrl(String url);

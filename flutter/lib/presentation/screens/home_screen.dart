@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import '../providers/url_provider.dart';
-import '../providers/theme_provider.dart';
 import '../widgets/url_card.dart';
 import '../widgets/parameter_item.dart';
 import '../widgets/empty_state.dart';
