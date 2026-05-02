@@ -7,9 +7,9 @@ on:
     branches: [ main ]
 
 env:
-  FLUTTER_VERSION: '3.16.0'
-  NODE_VERSION: '18'
-  JAVA_VERSION: '11'
+  FLUTTER_VERSION: '3.27.0'
+  NODE_VERSION: '20'
+  JAVA_VERSION: '17'
 
 jobs:
   # ==================== Linting ====================
